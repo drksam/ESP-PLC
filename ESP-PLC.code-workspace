@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "serial:/COM5",
+			"uri": "serial://com5/"
+		}
+	],
+	"settings": {
+		"python.languageServer": "Pylance",
+		"python.analysis.diagnosticSeverityOverrides": {
+			"reportMissingModuleSource": "none",
+			"reportShadowedImports": "none"
+		},
+		"circuitpython.board.version": null
+	}
+}
