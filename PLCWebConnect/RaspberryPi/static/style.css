@@ -1,0 +1,217 @@
+/* Custom styles for PLC Monitor Interface */
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.navbar-brand {
+    font-weight: 600;
+}
+
+/* Status Cards */
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 8px;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+/* Connection Status Indicators */
+.status-connected {
+    color: #28a745 !important;
+}
+
+.status-disconnected {
+    color: #dc3545 !important;
+}
+
+.status-unknown {
+    color: #6c757d !important;
+}
+
+/* Digital I/O Grid */
+.digital-io-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 15px;
+    padding: 10px 0;
+}
+
+.digital-io-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    background-color: #fff;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.digital-io-item:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+.digital-io-item.active {
+    border-color: #28a745;
+    background-color: #d4edda;
+}
+
+.digital-io-item.inactive {
+    border-color: #dc3545;
+    background-color: #f8d7da;
+}
+
+.digital-io-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+}
+
+.digital-io-status {
+    font-size: 2rem;
+    margin: 5px 0;
+}
+
+.digital-io-value {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+/* Data Register Cards */
+.register-item {
+    margin-bottom: 15px;
+}
+
+.register-card {
+    padding: 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background-color: #fff;
+    transition: border-color 0.3s ease;
+}
+
+.register-card:hover {
+    border-color: #007bff;
+}
+
+.register-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+}
+
+.register-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #007bff;
+    font-family: 'Courier New', monospace;
+}
+
+.register-hex {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-family: 'Courier New', monospace;
+}
+
+/* Connection Status Badge */
+.badge.bg-success {
+    background-color: #28a745 !important;
+}
+
+.badge.bg-danger {
+    background-color: #dc3545 !important;
+}
+
+.badge.bg-warning {
+    background-color: #ffc107 !important;
+    color: #000;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .digital-io-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 10px;
+    }
+    
+    .digital-io-item {
+        padding: 10px;
+    }
+    
+    .digital-io-status {
+        font-size: 1.5rem;
+    }
+}
+
+/* Loading spinner */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Error states */
+.error-state {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Animations */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.pulsing {
+    animation: pulse 2s infinite;
+}
+
+/* Custom button styles */
+.btn-toggle {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: white;
+}
+
+.btn-toggle:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+}
+
+.btn-toggle.active {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-indicator.connected {
+    background-color: #28a745;
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.3);
+}
+
+.status-indicator.disconnected {
+    background-color: #dc3545;
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.3);
+}
+
+.status-indicator.connecting {
+    background-color: #ffc107;
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.3);
+}
