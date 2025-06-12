@@ -13,7 +13,39 @@ from machine import UART, Pin
 import ujson
 import uasyncio as asyncio
 import sys
-from config import *
+
+# Import configuration
+try:
+    from config import *
+except ImportError:
+    # Default configuration if config.py is missing
+    WIFI_SSID = "YOUR_WIFI_SSID"
+    WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"
+    AP_SSID = "ESP32-PLC-Setup"
+    AP_PASSWORD = "plcsetup123"
+    AP_CHANNEL = 1
+    AP_MAX_CLIENTS = 4
+    UART_TX_PIN = 17
+    UART_RX_PIN = 16
+    STATUS_LED_PIN = 2
+    UART_PORT = 2
+    BAUD_RATE = 9600
+    DEVICE_ADDRESS = 1
+    UART_TIMEOUT = 1000
+    WEB_PORT = 80
+    POLL_INTERVAL = 2.0
+    MAX_RETRIES = 3
+    WIFI_TIMEOUT = 15
+    RESPONSE_TIMEOUT = 100
+    AP_IP = "192.168.4.1"
+    AP_SUBNET = "255.255.255.0"
+    AP_GATEWAY = "192.168.4.1"
+    AP_DNS = "192.168.4.1"
+
+def print_log(message, level="INFO"):
+    """Simple logging without dependencies"""
+    print(f"[{level}] {message}")
+
 try:
     from custom_scripts import create_script_engine
     SCRIPTS_AVAILABLE = True
@@ -148,7 +180,12 @@ class ESP32PLCBridge:
         self.sta_if = network.WLAN(network.STA_IF)
         self.ap_if = network.WLAN(network.AP_IF)
         
-        # Initialize UART for PLC communication
+        # Initialize UART for PLC communication (non-blocking)
+        self.uart = None
+        self.modbus = None
+        self.uart_error = None
+        
+        # Don't block startup on UART initialization
         try:
             self.uart = UART(
                 UART_PORT,
@@ -160,9 +197,9 @@ class ESP32PLCBridge:
             self.modbus = ModbusRTU(self.uart)
             print_log("UART initialized successfully")
         except Exception as e:
-            print_log(f"UART initialization failed: {e}", "ERROR")
-            self.uart = None
-            self.modbus = None
+            self.uart_error = str(e)
+            print_log(f"UART initialization failed: {e}", "WARNING")
+            print_log("Web server will start anyway - PLC connection can be retried later", "INFO")
         
         # PLC data storage
         self.plc_data = {
@@ -325,8 +362,14 @@ class ESP32PLCBridge:
             return False
     
     def poll_plc_data(self):
-        """Poll data from PLC"""
+        """Poll data from PLC (non-blocking)"""
+        # Always update system status first
+        self.plc_data['system_info']['uart_status'] = 'OK' if self.uart else 'Failed'
+        self.plc_data['system_info']['uart_error'] = self.uart_error
+        
         if not self.modbus:
+            self.plc_data['connected'] = False
+            self.plc_data['connection_error'] = f"UART not initialized: {self.uart_error}"
             return False
             
         try:
@@ -340,6 +383,7 @@ class ESP32PLCBridge:
                     i+1: inputs[i] for i in range(len(inputs))
                 }
                 self.plc_data['connected'] = True
+                self.plc_data['connection_error'] = None
             
             # Read digital outputs/coils (Y000-Y015)
             coils = self.modbus.read_coils(DEVICE_ADDRESS, 0, 16)
@@ -381,6 +425,7 @@ class ESP32PLCBridge:
             print_log(f"PLC polling error: {e}", "ERROR")
             self.plc_data['communication_errors'] += 1
             self.plc_data['connected'] = False
+            self.plc_data['connection_error'] = str(e)
             return False
     
     def create_config_portal_html(self):
@@ -585,9 +630,26 @@ class ESP32PLCBridge:
             value = self.plc_data['data_registers'].get(addr, 0)
             registers_html += f'<div class="register-item"><strong>{addr}</strong><br>{value}</div>'
         
-        # Status
+        # Status and error information
         status_class = "connected" if self.plc_data['connected'] else "disconnected"
         connection_status = "Connected" if self.plc_data['connected'] else "Disconnected"
+        
+        # Error information
+        error_section = ""
+        if not self.plc_data['connected']:
+            error_msg = self.plc_data.get('connection_error', 'Unknown error')
+            uart_status = self.plc_data['system_info'].get('uart_status', 'Unknown')
+            uart_error = self.plc_data['system_info'].get('uart_error', 'None')
+            
+            error_section = f'''
+            <div class="error-section">
+                <h3>⚠️ Connection Issues</h3>
+                <p><strong>UART Status:</strong> {uart_status}</p>
+                {f'<p><strong>UART Error:</strong> {uart_error}</p>' if uart_error else ''}
+                {f'<p><strong>Connection Error:</strong> {error_msg}</p>' if error_msg else ''}
+                <p><strong>Note:</strong> Web interface works without PLC connection for testing</p>
+            </div>
+            '''
         
         # Last update
         last_update = self.plc_data['last_update']
@@ -622,6 +684,9 @@ class ESP32PLCBridge:
         .refresh-btn:hover {{ background: #0056b3; }}
         .config-btn {{ background: #ffc107; color: #212529; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-left: 10px; }}
         .config-btn:hover {{ background: #e0a800; }}
+        .error-section {{ background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 20px; border-radius: 5px; margin-bottom: 20px; }}
+        .error-section h3 {{ margin-top: 0; color: #721c24; }}
+        .error-section p {{ margin: 8px 0; }}
     </style>
 </head>
 <body>
@@ -655,6 +720,8 @@ class ESP32PLCBridge:
                 <div>{gc.mem_free()} bytes</div>
             </div>
         </div>
+        
+        {error_section}
         
         <div class="data-section">
             <h3>📥 Digital Inputs (X000-X015)</h3>
@@ -802,20 +869,32 @@ Connection: close\r
     
     async def start_web_server(self):
         """Start the web server"""
-        server = await asyncio.start_server(
-            self.handle_client, 
-            '0.0.0.0', 
-            WEB_PORT
-        )
-        
-        if self.operating_mode == MODE_AP:
-            print_log(f"Configuration portal started on http://{AP_IP}")
-        else:
-            ip_address = self.plc_data['system_info'].get('ip_address', 'Unknown')
-            print_log(f"PLC monitor started on http://{ip_address}")
-        
-        async with server:
-            await server.serve_forever()
+        try:
+            print_log(f"Starting web server on port {WEB_PORT}...")
+            
+            server = await asyncio.start_server(
+                self.handle_client, 
+                '0.0.0.0', 
+                WEB_PORT
+            )
+            
+            if self.operating_mode == MODE_AP:
+                print_log(f"✓ Configuration portal started on http://{AP_IP}:{WEB_PORT}")
+            else:
+                ip_address = self.plc_data['system_info'].get('ip_address', 'Unknown')
+                print_log(f"✓ PLC monitor started on http://{ip_address}:{WEB_PORT}")
+            
+            print_log("Web server listening for connections...")
+            
+            async with server:
+                await server.serve_forever()
+                
+        except Exception as e:
+            print_log(f"CRITICAL: Web server failed to start: {e}", "ERROR")
+            print_log(f"Port {WEB_PORT} may be in use or blocked", "ERROR")
+            # Don't crash the entire application
+            while self.running:
+                await asyncio.sleep(10)
     
     async def plc_polling_task(self):
         """Background task for PLC data polling"""
